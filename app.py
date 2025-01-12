@@ -1,4 +1,8 @@
 import gradio as gr
+from markitdown import MarkItDown
+from PIL import Image
+from google import genai
+from google.genai import types
 
 DEFAULT_SYSTEM_PROMPT = """당신은 과학/공학 분야의 전문가이자 소셜 미디어 마케팅 전문가입니다.
 제공된 배경 지식과 이미지를 바탕으로 인스타그램에 적합한 홍보글을 작성해야 합니다.
@@ -8,13 +12,52 @@ DEFAULT_SYSTEM_PROMPT = """당신은 과학/공학 분야의 전문가이자 소
 2. 핵심 내용을 먼저 전달하고, 세부 내용을 부연 설명하세요
 3. 적절한 이모지를 활용하여 가독성을 높이세요
 4. 관련 해시태그를 5-10개 포함하세요
-5. 전체 글자 수는 1000자 이내로 작성하세요"""
+5. 전체 글자 수는 1000자 이내로 작성하세요
+6. Plain text로 작성하고, Markdown 형식을 사용하지 마세요"""
+
+
+PROMPT_TEMPLATE = """배경 지식:
+{background_knowledge}
+
+이미지 설명:
+{image_description}
+
+위 내용을 바탕으로 인스타그램 홍보 포스트를 작성해주세요."""
+
+
+def extract_text_from_pdf(pdf_file):
+    if pdf_file is None:
+        return ""
+    result = MarkItDown().convert(pdf_file)
+    return f"<article>{result.text_content}</article>"
 
 
 def create_instagram_post(
-    model_choice, api_token, system_prompt, pdf_files, image, image_description
+    model_choice, api_token, system_prompt, pdf_files, image_nparray, image_description
 ):
-    pass
+    background_articles = []
+    for pdf_file in pdf_files:
+        background_articles.append(extract_text_from_pdf(pdf_file))
+
+    background_knowledge = "\n".join(background_articles)
+
+    image = Image.fromarray(image_nparray)
+    image.thumbnail([512, 512])
+
+    prompt = PROMPT_TEMPLATE.format(
+        background_knowledge=background_knowledge, image_description=image_description
+    )
+    client = genai.Client(api_key=api_token)
+    response = client.models.generate_content(
+        model=model_choice,
+        contents=[image, prompt],
+        config=types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            temperature=0.5,
+            candidate_count=1,
+        ),
+    )
+    return response.text
 
 
 """
@@ -27,7 +70,11 @@ with gr.Blocks() as iface:
         # 첫 번째 컬럼: 모델 설정
         with gr.Column():
             gr.Markdown("### 모델 설정")
-            model_choice = gr.Dropdown(choices=["Gemini"], label="LLM 모델 선택")
+            model_choice = gr.Dropdown(
+                choices=["gemini-2.0-flash-exp"],
+                label="LLM 모델 선택",
+                value="gemini-2.0-flash-exp",
+            )
             api_token = gr.Textbox(
                 label="API 토큰",
                 placeholder="선택한 모델의 API 토큰을 입력하세요",
@@ -57,7 +104,9 @@ with gr.Blocks() as iface:
         # 세 번째 컬럼: 출력
         with gr.Column():
             gr.Markdown("### 생성된 포스트")
-            output = gr.Textbox(label="생성된 인스타그램 포스트", lines=10)
+            output = gr.Textbox(
+                label="생성된 인스타그램 포스트", lines=10, show_copy_button=True
+            )
 
     submit_btn.click(
         fn=create_instagram_post,

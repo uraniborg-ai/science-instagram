@@ -12,7 +12,7 @@ DEFAULT_SYSTEM_PROMPT = """당신은 과학/공학 분야의 전문가이자 소
 2. 핵심 내용을 먼저 전달하고, 세부 내용을 부연 설명하세요
 3. 적절한 이모지를 활용하여 가독성을 높이세요
 4. 관련 해시태그를 5-10개 포함하세요
-5. 전체 글자 수는 1000자 이내로 작성하세요
+5. 전체 글자 수는 500자 이내로 작성하세요
 6. Plain text로 작성하고, Markdown 형식을 사용하지 마세요"""
 
 
@@ -53,7 +53,7 @@ def create_instagram_post(
         contents=[image, prompt],
         config=types.GenerateContentConfig(
             system_instruction=system_prompt,
-            temperature=0.5,
+            temperature=0.7,
             candidate_count=1,
         ),
     )
@@ -105,7 +105,7 @@ with gr.Blocks() as iface:
         with gr.Column():
             gr.Markdown("### 생성된 포스트")
             output = gr.Textbox(
-                label="생성된 인스타그램 포스트", lines=10, show_copy_button=True
+                label="생성된 인스타그램 포스트", lines=20, show_copy_button=True
             )
 
     submit_btn.click(
